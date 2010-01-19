@@ -1,6 +1,3 @@
-# TODO:
-#
-
 [collect ./stage/common.spec]
 [collect ./stage/capture/tar.spec]
 
@@ -31,12 +28,20 @@ version: << $[path/mirror/control]/version/stage3
 chroot/run: [
 #!/bin/bash
   $[[steps/setup]]
+  cat > /etc/portage/package.mask << "EOF"
+$[[files/package.mask]]
+EOF
+
   export USE="$[portage/USE] bindist"
   emerge $eopts $[emerge/packages] || exit 1
-  if [ '$[ruby/gems?]' = 'yes' ]
-  then
-    gem install --backtrace --no-rdoc --no-ri $[ruby/gems:lax]
-  fi
+
+  cat > /root/.gemrc << "EOF"
+$[[files/gemrc]]
+EOF
+
+  for name in $[ruby/gems:lax]; do 
+    gem install --backtrace $name
+  done
 
   # mounts
   echo "Updating mtab and fstab..."
@@ -100,24 +105,10 @@ EOF
 $[[files/motd]]
 EOF
 
-  if [ -d /var/www ]; then
-    mkdir /var/www/.ssh
-    chown apache.apache /var/www/.ssh
-    chmod 0700 /var/www/.ssh
-    cat > /var/www/.ssh/known_hosts << "EOF"
-$[[files/known_hosts]]
-EOF
-  fi
+  mkdir -p /srv/instances
 
-  cat > /root/.gemrc << "EOF"
-$[[files/gemrc]]
-EOF
+  $[[chroot/postinst:lax]]
 
-  # TESTS
-  echo "Performing QA checks..."
-  # tty must exist
-  [ ! -e /dev/tty ] && exit 16
-  echo "/dev/tty check: PASSED"
   echo "OpenVZ script complete."
 
 ]
@@ -132,6 +123,6 @@ motd: [
 
 ]
 
-authorized_keys << $[path/mirror/assets]/authorized_keys
-known_hosts << $[path/mirror/assets]/known_hosts
-gemrc << $[path/mirror/assets]/gemrc
+authorized_keys: << $[path/mirror/assets]/authorized_keys
+gemrc: << $[path/mirror/assets]/gemrc
+package.mask: << $[path/mirror/assets]/package.mask
