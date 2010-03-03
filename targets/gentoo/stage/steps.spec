@@ -13,7 +13,7 @@ setup: [
 /usr/sbin/env-update
 gcc-config 1
 source /etc/profile
-export MAKEOPTS="$[portage/MAKEOPTS]"
+export MAKEOPTS="$[portage/MAKEOPTS:zap]"
 export EMERGE_WARNING_DELAY=0
 export CLEAN_DELAY=0
 export EBEEP_IGNORE=0
@@ -183,14 +183,17 @@ chroot/test: [
 #!/usr/bin/python
 import os,sys,glob
 from stat import *
+from types import *
 
 root="$[portage/ROOT]"
 
 etcSecretFiles = [
 	"/etc/default/useradd",
 	"/etc/securetty",
-	"/etc/shadow",
 	"/etc/ssh/sshd_config" ]
+
+etcSecretGroupFiles = [
+	"/etc/shadow" ]
 
 etcSecretDirs = [
 	"/etc/skel/.ssh",
@@ -212,6 +215,8 @@ def goGlob(myglob):
 
 def fileCheck(files,perms,uid=0,gid=0):
 	global abort
+	if type(perms) == StringType:
+		perms = [ perms ]
 	# If a secret file exists, then ensure it has proper perms, otherwise abort
 	for file in files:
 		myfile = os.path.normpath(root+"/"+file)
@@ -220,8 +225,8 @@ def fileCheck(files,perms,uid=0,gid=0):
 			myperms = "%o" % mystat[ST_MODE]
 			myuid = mystat[ST_UID]
 			mygid = mystat[ST_GID]
-			if myperms != perms:
-				print "ERROR: file %s does not have proper perms: %s (should be %s)" % ( myfile, myperms, perms )
+			if myperms not in perms:
+				print "ERROR: file %s does not have proper perms: %s (should be one of %s)" % ( myfile, myperms, perms )
 				abort = True
 			else:
 				print "TEST: file %s OK" % myfile
@@ -234,6 +239,7 @@ def fileCheck(files,perms,uid=0,gid=0):
 
 
 fileCheck(etcSecretFiles,"100600")
+fileCheck(etcSecretGroupFiles,["100640","100600"])
 fileCheck(etcSecretDirs,"40700")
 fileCheck(etcROFiles,"100644")
 fileCheck(goGlob("/etc/pam.d/*"),"100644")
@@ -268,7 +274,7 @@ fi
 # support for "live" git snapshot tarballs:
 if [ -e $[path/chroot]/usr/portage/.git ]
 then
-	( cd $[path/chroot]/usr/portage; git checkout $[git/branch] || exit 50 )
+	( cd $[path/chroot]/usr/portage; git checkout $[snapshot/source/branch] || exit 50 )
 fi
 cat << "EOF" > $[path/chroot]/etc/make.conf || exit 5
 $[[files/make.conf]]
